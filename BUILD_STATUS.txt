@@ -1,0 +1,1 @@
+Исходный проект подготовлен. APK НЕ собран и НЕ проверен. Для сборки используйте GitHub Actions workflow .github/workflows/android.yml.
