@@ -1,4 +1,4 @@
-ARK Radio v4 — source project
+ARK Radio v4.1 — source project
 
 Included:
 - 17 Zaycev.FM radio stream entries
@@ -8,7 +8,9 @@ Included:
 - app icon resources
 - playlist catalog prototype: Rock -> subgenre -> five demo playlist names per subgenre
 - local saved-playlist library
+- button to open the official ZAYCEV.NET catalog for real playlists and available downloads
 - GitHub Actions workflow for assembleDebug and APK artifact upload
 
 Build status: NOT BUILT OR VERIFIED LOCALLY. Gradle is not installed in the current environment.
-The playlist catalog uses demo names only. Live Zaycev.net playlist/track ingestion is not yet connected or verified. Do not describe these demo entries as real scraped playlists.
+
+Important: the app does not have a verified public Zaycev.net API integration. Playlist names in the in-app Rock hierarchy are demo entries, not real tracks. Actual song downloads must use official service links and permissions; a continuous radio stream cannot be treated as a downloadable MP3 track.

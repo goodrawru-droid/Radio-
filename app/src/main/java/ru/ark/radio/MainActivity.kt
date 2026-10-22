@@ -2,6 +2,8 @@ package ru.ark.radio
 
 import android.Manifest
 import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -53,6 +55,9 @@ private val PANEL = Color(0xFF1B1D22)
 private val ACCENT = Color(0xFF9C7BFF)
 private val MUTED = Color(0xFF9A9DA7)
 
+private const val OFFICIAL_MUSIC_CATALOG = "https://zaycev.net/"
+private const val OFFICIAL_RADIO_SITE = "https://www.zaycev.fm/"
+
 class MainActivity : ComponentActivity() {
     private var controller by mutableStateOf<MediaController?>(null)
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
@@ -88,6 +93,8 @@ private fun RadioScreen(controller: MediaController?) {
     var selected by remember { mutableStateOf(StationCatalog.all.first()) }
     var playing by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Выберите станцию") }
+    var trackTitle by remember { mutableStateOf<String?>(null) }
+    var trackArtist by remember { mutableStateOf<String?>(null) }
     var showEqualizer by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
@@ -117,8 +124,16 @@ private fun RadioScreen(controller: MediaController?) {
                 Toast.makeText(context, "Не удалось воспроизвести ${selected.name}", Toast.LENGTH_LONG).show()
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                trackTitle = null
+                trackArtist = null
                 val title = mediaItem?.mediaMetadata?.title?.toString() ?: return
                 StationCatalog.all.firstOrNull { it.name == title }?.let { selected = it }
+            }
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                val title = mediaMetadata.title?.toString()?.trim()
+                val artist = mediaMetadata.artist?.toString()?.trim()
+                trackTitle = title?.takeIf { it.isNotBlank() && it != selected.name && it != "ARK Radio" }
+                trackArtist = artist?.takeIf { it.isNotBlank() && it != "ARK Radio • Zaycev.FM" }
             }
         }
         controller.addListener(listener)
@@ -126,6 +141,8 @@ private fun RadioScreen(controller: MediaController?) {
     }
     fun play(station: Station) {
         selected = station
+        trackTitle = null
+        trackArtist = null
         val c = controller
         if (c == null) { status = "Плеер подключается. Подождите и попробуйте снова."; return }
         try {
@@ -190,7 +207,7 @@ private fun RadioScreen(controller: MediaController?) {
                         }
                     }
                     Column(Modifier.weight(1.4f)) {
-                        PlayerCard(selected, status, playing, favorites.contains(selected.id), { if (favorites.contains(selected.id)) favorites = favorites - selected.id else favorites = favorites + selected.id }, {
+                        PlayerCard(selected, trackTitle, trackArtist, status, playing, favorites.contains(selected.id), { if (favorites.contains(selected.id)) favorites = favorites - selected.id else favorites = favorites + selected.id }, {
                             val c = controller
                             if (c == null) status = "Плеер подключается. Попробуйте ещё раз."
                             else if (c.isPlaying) c.pause() else if (c.mediaItemCount > 0 && c.playbackState != Player.STATE_IDLE) c.play() else play(selected)
@@ -212,7 +229,7 @@ private fun RadioScreen(controller: MediaController?) {
                         items(categories) { cat -> FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(cat) }) }
                     }
                     Spacer(Modifier.height(10.dp))
-                    PlayerCard(selected, status, playing, favorites.contains(selected.id), { if (favorites.contains(selected.id)) favorites = favorites - selected.id else favorites = favorites + selected.id }, {
+                    PlayerCard(selected, trackTitle, trackArtist, status, playing, favorites.contains(selected.id), { if (favorites.contains(selected.id)) favorites = favorites - selected.id else favorites = favorites + selected.id }, {
                         val c = controller
                         if (c == null) status = "Плеер подключается. Попробуйте ещё раз."
                         else if (c.isPlaying) c.pause() else if (c.mediaItemCount > 0 && c.playbackState != Player.STATE_IDLE) c.play() else play(selected)
@@ -259,6 +276,7 @@ private fun RockPlaylistDialog(
     onRemove: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var subgenre by remember { mutableStateOf<String?>(null) }
     var playlist by remember { mutableStateOf<String?>(null) }
     var showSaved by remember { mutableStateOf(false) }
@@ -309,8 +327,15 @@ private fun RockPlaylistDialog(
                     playlist != null -> {
                         Text("Подборка: ${playlist}", color = Color.White, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
-                        Text("Это первый прототип каталога. Название и вложенность плейлиста доступны, но реальные треки пока не загружаются: подключение к каталогу Zaycev.net ещё нужно проверить.", color = MUTED, fontSize = 13.sp)
-                        Spacer(Modifier.height(12.dp))
+                        Text("Встроенный каталог подборок пока не имеет подтверждённого публичного API. Открой официальную страницу, чтобы просмотреть реальные сборники и доступные для скачивания треки.", color = MUTED, fontSize = 13.sp)
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OFFICIAL_MUSIC_CATALOG))) }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Открыть каталог ZAYCEV.NET") }
+                        Spacer(Modifier.height(8.dp))
                         Button(onClick = { onSave(playlist!!) }, enabled = playlist !in savedPlaylists, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.Favorite, null)
                             Spacer(Modifier.width(8.dp))
@@ -336,9 +361,16 @@ private fun RockPlaylistDialog(
                         }
                     }
                     else -> {
-                        Text("Пока подключён один тестовый жанр", color = MUTED, fontSize = 12.sp)
+                        Text("Встроенная навигация по року — локальная подборка ARK Radio. Реальные списки и доступные загрузки открываются на официальном сайте.", color = MUTED, fontSize = 12.sp)
                         Spacer(Modifier.height(8.dp))
-                        PlaylistCatalogRow("Рок", "5 поджанров · 25 подборок", Icons.Default.MusicNote, onClick = { subgenre = "__ROCK__" })
+                        PlaylistCatalogRow("Рок", "5 поджанров · 25 подборок ARK", Icons.Default.MusicNote, onClick = { subgenre = "__ROCK__" })
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OFFICIAL_MUSIC_CATALOG))) }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Реальные сборники и скачивание") }
                     }
                 }
             }
@@ -387,14 +419,18 @@ private fun StationRow(station: Station, selected: Station, favorites: Set<Strin
 }
 
 @Composable
-private fun PlayerCard(station: Station, status: String, playing: Boolean, favorite: Boolean, onFavorite: () -> Unit, onToggle: () -> Unit, onStop: () -> Unit, onEqualizer: () -> Unit) {
+private fun PlayerCard(station: Station, trackTitle: String?, trackArtist: String?, status: String, playing: Boolean, favorite: Boolean, onFavorite: () -> Unit, onToggle: () -> Unit, onStop: () -> Unit, onEqualizer: () -> Unit) {
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF171821))) {
         Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(if (playing) "●  СЕЙЧАС В ЭФИРЕ" else "ARK RADIO • ПЛЕЕР", color = ACCENT, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Text(station.name, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(station.category, color = MUTED, fontSize = 12.sp)
+                    Spacer(Modifier.height(5.dp))
+                    Text("СЕЙЧАС ИГРАЕТ", color = MUTED, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(trackTitle ?: "Информация о треке недоступна", color = if (trackTitle != null) Color.White else MUTED, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                    if (!trackArtist.isNullOrBlank()) Text(trackArtist, color = ACCENT, fontSize = 12.sp, maxLines = 1)
+                    Text(station.category, color = MUTED, fontSize = 11.sp)
                 }
                 IconButton(onClick = onFavorite) { Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Избранное", tint = if (favorite) ACCENT else MUTED) }
             }
