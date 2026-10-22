@@ -1,1 +1,14 @@
-Исходный проект подготовлен. APK НЕ собран и НЕ проверен. Для сборки используйте GitHub Actions workflow .github/workflows/android.yml.
+ARK Radio v4 — source project
+
+Included:
+- 17 Zaycev.FM radio stream entries
+- dark Compose UI and animated spectrum visualization
+- station search/categories/favorites
+- equalizer dialog
+- app icon resources
+- playlist catalog prototype: Rock -> subgenre -> five demo playlist names per subgenre
+- local saved-playlist library
+- GitHub Actions workflow for assembleDebug and APK artifact upload
+
+Build status: NOT BUILT OR VERIFIED LOCALLY. Gradle is not installed in the current environment.
+The playlist catalog uses demo names only. Live Zaycev.net playlist/track ingestion is not yet connected or verified. Do not describe these demo entries as real scraped playlists.
